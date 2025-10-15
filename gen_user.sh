@@ -26,7 +26,8 @@ if id -u "$USERNAME" >/dev/null 2>&1; then
 else
   echo "Creating user $USERNAME ..."
   useradd -m -s /bin/bash -G sudo "$USERNAME"
-  passwd -l "$USERNAME" || true
+  echo "Set a password for $USERNAME:"
+  passwd "$USERNAME"
   echo "User $USERNAME created and added to sudo group."
 fi
 
@@ -51,7 +52,6 @@ cleanup() { rm -f "$TMP_KEYS" || true; }
 trap cleanup EXIT
 
 derive_raw_url() {
-  # Convert https://github.com/<user>/<repo>/blob/<branch>/path -> https://raw.githubusercontent.com/<user>/<repo>/<branch>/path
   echo "$1" | sed -E 's#https://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.*)#https://raw.githubusercontent.com/\1/\2/\3/\4#'
 }
 
@@ -75,12 +75,10 @@ if [ "$fetch_ok" != true ]; then
   exit 1
 fi
 
-# 5) Add any missing keys (ignore blank/comment lines)
+# 5) Add any missing keys
 added_any=false
 while IFS= read -r line; do
-  # trim leading/trailing spaces
   key="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-  # skip blanks and comments
   [ -z "$key" ] && continue
   echo "$key" | grep -qE '^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521)) ' || continue
   if grep -Fqx "$key" "$AUTH_KEYS"; then
@@ -121,7 +119,7 @@ set_sshd_option "ChallengeResponseAuthentication" "no" "$SSHD_CONFIG"
 set_sshd_option "PubkeyAuthentication" "yes" "$SSHD_CONFIG"
 set_sshd_option "UsePAM" "yes" "$SSHD_CONFIG"
 
-# 7) Lock root password (defense-in-depth)
+# 7) Lock root password
 passwd -l root || true
 
 # 8) Restart SSH
